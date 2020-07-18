@@ -3,14 +3,14 @@ from ntfs.mft.file_entry import FileEntry
 
 class File:
 
-    def __init__(self, file_entry: str):
-        self._file_entry: FileEntry = file_entry
+    def __init__(self, file_entry: FileEntry):
+        self._file_entry = file_entry
 
     def __enter__(self) -> 'File':
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_value, tb) -> None:
+    def __exit__(self, *exc_info) -> None:
         self.close()
 
     def open(self) -> None:

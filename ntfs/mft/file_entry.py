@@ -1,7 +1,7 @@
 from struct import unpack
 
 from ntfs.mft.file_attributes import FileAttributes, FileAttribute
-from ntfs.utils.header import MultiHeader, Header
+from ntfs.utils.header import MultiHeader, Header, HeaderGenerator
 
 
 class FileEntry(MultiHeader):
@@ -16,23 +16,23 @@ class FileEntry(MultiHeader):
     @ property
     def path(self) -> str:
         for attribute in self._attributes:
-            if attribute.attribute_type == FileAttribute.Type.FILE_NAME:
-                return attribute.data().file_name.decode('utf-16')
+            if attribute.attribute_type == FileAttribute.AttrType.FILE_NAME:
+                return attribute.data().file_name
 
     @ property
     def file_size(self) -> int:
         for attribute in self._attributes:
-            if attribute.attribute_type == FileAttribute.Type.DATA:
+            if attribute.attribute_type == FileAttribute.AttrType.DATA:
                 return attribute.data_size
         return 0
 
     @ property
-    def first_attribute_offset(self):
+    def first_attribute_offset(self) -> int:
         return self._header.first_attribute_offset
 
-    def _get_next_header_info(self):
+    def _get_next_header_info(self) -> HeaderGenerator:
         yield FileEntryHeader, 0
-        self._header: FileEntryHeader = self._headers.pop(0)
+        self._header = self._headers.pop(0)
 
         if not self:
             return
@@ -45,7 +45,7 @@ class FileEntryHeader(Header):
 
     FMT = 'IHHQHHHHIIQHHI'
 
-    def __init__(self, data, offset):
+    def __init__(self, data: bytes, offset: int):
         super(FileEntryHeader, self).__init__(data, offset)
 
         self.magic, \

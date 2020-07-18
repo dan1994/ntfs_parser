@@ -2,13 +2,13 @@ from struct import error as struct_error
 from typing import List
 
 from ntfs.mft.file_attribute import FileAttribute
-from ntfs.utils.header import MultiHeader
+from ntfs.utils.header import MultiHeader, HeaderGenerator
 from ntfs.utils import ntfs_logger
 
 
 class FileAttributes(MultiHeader):
 
-    def __init__(self, data, offset):
+    def __init__(self, data: bytes, offset: int):
         try:
             super(FileAttributes, self).__init__(data, offset)
         except struct_error:
@@ -24,9 +24,11 @@ class FileAttributes(MultiHeader):
     def __len__(self) -> int:
         return len(self._headers)
 
-    def _get_next_header_info(self):
+    def _get_next_header_info(self) -> HeaderGenerator:
         current_offset = 0
         yield FileAttribute, current_offset
-        while self._headers[-1].attribute_type != FileAttribute.Type.INVALID:
+
+        while self._headers[-1].attribute_type != \
+                FileAttribute.AttrType.INVALID:
             current_offset += len(self._headers[-1])
             yield FileAttribute, current_offset

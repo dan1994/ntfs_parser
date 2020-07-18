@@ -1,6 +1,6 @@
 class LogicalVolumeFile:
 
-    FILE_PATH_FORMAT: str = r'\\.\{}:'
+    FILE_PATH_FORMAT = r'\\.\{}:'
 
     def __init__(self, volume_letter: str):
         self._letter = volume_letter
@@ -10,7 +10,7 @@ class LogicalVolumeFile:
         self.open()
         return self
 
-    def __exit__(self, exc_type, exc_value, tb) -> None:
+    def __exit__(self, *exc_info) -> None:
         self.close()
 
     def open(self) -> None:

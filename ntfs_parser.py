@@ -2,7 +2,7 @@
 from ntfs import open_ntfs_file
 
 
-def main(path: str):
+def main(path: str) -> None:
     with open_ntfs_file(path) as ntfs_file:
         print(ntfs_file.read())
 

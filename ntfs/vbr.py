@@ -6,16 +6,16 @@ from ntfs.utils import ntfs_logger
 
 class Vbr:
 
-    SIZE: int = 512
+    SIZE = 512
 
-    BPB_OFFSET: int = 0xB
-    MFT_CLUSTER_OFFSET: int = 0x30
+    BPB_OFFSET = 0xB
+    MFT_CLUSTER_OFFSET = 0x30
 
     def __init__(self, volume_letter: str):
         ntfs_logger.debug(f"{self.__class__}")
 
         with LogicalVolumeFile(volume_letter) as volume_file:
-            raw_data: bytes = volume_file.read(Vbr.SIZE)
+            raw_data = volume_file.read(Vbr.SIZE)
 
         self._extract_data(raw_data)
 

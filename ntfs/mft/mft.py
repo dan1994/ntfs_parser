@@ -13,7 +13,7 @@ class Mft:
 
         self._find_mft_size()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._volume_file.close()
 
     def __iter__(self) -> 'Mft':
