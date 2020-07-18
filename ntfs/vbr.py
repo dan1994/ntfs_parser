@@ -15,7 +15,7 @@ class Vbr:
         ntfs_logger.debug(f"{self.__class__}")
 
         with LogicalVolumeFile(volume_letter) as volume_file:
-            raw_data: bytes = volume_file.read(0, Vbr.SIZE)
+            raw_data: bytes = volume_file.read(Vbr.SIZE)
 
         self._extract_data(raw_data)
 

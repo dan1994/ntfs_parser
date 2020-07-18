@@ -2,7 +2,6 @@ from struct import unpack
 
 from ntfs.mft.file_attributes import FileAttributes, FileAttribute
 from ntfs.utils.header import MultiHeader, Header
-from ntfs.utils import ntfs_logger
 
 
 class FileEntry(MultiHeader):
@@ -10,11 +9,6 @@ class FileEntry(MultiHeader):
     SIZE = 1024
 
     MAGIC = unpack('I', b'FILE')[0]
-
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(FileEntry, self).__init__(volume_letter, base_address)
 
     def __bool__(self) -> bool:
         return self._header.magic == FileEntry.MAGIC
@@ -27,20 +21,23 @@ class FileEntry(MultiHeader):
 
     @ property
     def file_size(self) -> int:
-        return self._header.used_size
+        for attribute in self._attributes:
+            if attribute.attribute_type == FileAttribute.Type.DATA:
+                return attribute.data_size
+        return 0
 
     @ property
     def first_attribute_offset(self):
         return self._header.first_attribute_offset
 
     def _get_next_header_info(self):
-        yield FileEntryHeader, self._base_address
+        yield FileEntryHeader, 0
         self._header: FileEntryHeader = self._headers.pop(0)
 
         if not self:
             return
 
-        yield FileAttributes, self._base_address + self.first_attribute_offset
+        yield FileAttributes, self.first_attribute_offset
         self._attributes = self._headers.pop(0)
 
 
@@ -48,11 +45,8 @@ class FileEntryHeader(Header):
 
     FMT = 'IHHQHHHHIIQHHI'
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(FileEntryHeader, self).__init__(volume_letter, base_address,
-                                              FileEntryHeader.FMT)
+    def __init__(self, data, offset):
+        super(FileEntryHeader, self).__init__(data, offset)
 
         self.magic, \
             self.update_sequence_offset, \

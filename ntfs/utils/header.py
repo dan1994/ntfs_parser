@@ -1,20 +1,23 @@
-from struct import unpack
+from struct import unpack_from
 
-from ntfs.utils.logical_volume_file import LogicalVolumeFile
+from ntfs.utils import ntfs_logger
 
 
 class MultiHeader:
 
-    def __init__(self, volume_letter, base_address):
-        self._volume_letter = volume_letter
-        self._base_address = base_address
+    def __init__(self, data, offset):
+        ntfs_logger.debug(f'{self.__class__}, {hex(offset)}')
+
+        self._data = data
+        self._offset = offset
         self._headers = []
 
         self._parse_headers()
 
     def _parse_headers(self):
         for header_type, offset in self._get_next_header_info():
-            self._headers.append(header_type(self._volume_letter, offset))
+            total_offset = self._offset + offset
+            self._headers.append(header_type(self._data, total_offset))
 
     def _get_next_header_info(self):
         pass
@@ -22,26 +25,13 @@ class MultiHeader:
 
 class Header:
 
-    def __init__(self, volume_letter, base_address, fmt=''):
-        self._volume_letter = volume_letter
-        self._base_address = base_address
-        self._fmt = fmt
-        self._size = Header._get_size_from_fmt(self._fmt)
+    FMT = ''
 
-        self._parse_data()
+    def __init__(self, data, offset):
+        ntfs_logger.debug(f'{self.__class__}, {hex(offset)}')
+
+        self._data = unpack_from(self.FMT, data, offset)
 
     def __len__(self):
-        return self._size
-
-    def _parse_data(self):
-        if len(self._fmt) > 0:
-            with LogicalVolumeFile(self._volume_letter) as volume_file:
-                raw_data = volume_file.read(self._base_address, self._size)
-                self._data = unpack(self._fmt, raw_data)
-        else:
-            self._data = None
-
-    @staticmethod
-    def _get_size_from_fmt(fmt):
-        return fmt.count('B') + 2 * fmt.count('H') + 4 * fmt.count('I') + \
-            8 * fmt.count('Q')
+        return self.FMT.count('B') + 2 * self.FMT.count('H') + \
+            4 * self.FMT.count('I') + 8 * self.FMT.count('Q')

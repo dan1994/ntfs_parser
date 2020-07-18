@@ -1,6 +1,4 @@
-from ntfs.utils.logical_volume_file import LogicalVolumeFile
 from ntfs.utils.header import Header, MultiHeader
-from ntfs.utils import ntfs_logger
 
 
 class FileAttribute(MultiHeader):
@@ -10,11 +8,6 @@ class FileAttribute(MultiHeader):
         FILE_NAME = 0x30
         DATA = 0x80
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(FileAttribute, self).__init__(volume_letter, base_address)
-
     def data(self):
         if self.is_resident:
             return self._type_header
@@ -22,11 +15,17 @@ class FileAttribute(MultiHeader):
             raise NotImplementedError(
                 'Not handling non-resident attribute data yet')
 
-    @ property
+    @property
+    def data_size(self):
+        if self.is_resident:
+            return self._residency_header.attribute_length
+        return self._residency_header.attribute_size
+
+    @property
     def attribute_type(self):
         return self._constant_header.attribute_type
 
-    @ property
+    @property
     def is_resident(self):
         return not self._constant_header.non_resident
 
@@ -34,7 +33,8 @@ class FileAttribute(MultiHeader):
         return self._constant_header.length
 
     def _get_next_header_info(self):
-        offset = self._base_address
+        offset = 0
+
         yield FileAttributeHeader, offset
         self._constant_header = self._headers.pop(0)
         offset += len(self._constant_header)
@@ -70,11 +70,8 @@ class FileAttributeHeader(Header):
 
     FMT = 'IIBBHHH'
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(FileAttributeHeader, self).__init__(volume_letter, base_address,
-                                                  FileAttributeHeader.FMT)
+    def __init__(self, data, offset):
+        super(FileAttributeHeader, self).__init__(data, offset)
 
         self.attribute_type, \
             self.length, \
@@ -89,12 +86,8 @@ class ResidentFileAttributeHeader(Header):
 
     FMT = 'IHBB'
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(ResidentFileAttributeHeader, self).\
-            __init__(volume_letter, base_address,
-                     ResidentFileAttributeHeader.FMT)
+    def __init__(self, data, offset):
+        super(ResidentFileAttributeHeader, self).__init__(data, offset)
 
         self.attribute_length, \
             self.attribute_offset, \
@@ -106,12 +99,8 @@ class NonResidentFileAttributeHeader(Header):
 
     FMT = 'QQHHIQQQ'
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(NonResidentFileAttributeHeader, self).\
-            __init__(volume_letter, base_address,
-                     NonResidentFileAttributeHeader.FMT)
+    def __init__(self, data, offset):
+        super(NonResidentFileAttributeHeader, self).__init__(data, offset)
 
         self.first_cluster, \
             self.last_cluster, \
@@ -127,11 +116,8 @@ class FileNameAttributeHeader(Header):
 
     FMT = 'IHHQQQQQQIIBB'
 
-    def __init__(self, volume_letter, base_address):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
-
-        super(FileNameAttributeHeader, self).\
-            __init__(volume_letter, base_address, FileNameAttributeHeader.FMT)
+    def __init__(self, data, offset):
+        super(FileNameAttributeHeader, self).__init__(data, offset)
 
         self.parent_record_number1, \
             self.parent_record_number2, \
@@ -147,6 +133,7 @@ class FileNameAttributeHeader(Header):
             self.file_name_length, \
             self.namespace_type = self._data
 
-        with LogicalVolumeFile(self._volume_letter) as volume_file:
-            self.file_name = volume_file.read(self._base_address + self._size,
-                                              self.file_name_length * 2)
+        file_name_offset = offset + len(self)
+        file_name_size = self.file_name_length * 2
+        self.file_name = data[file_name_offset:
+                              file_name_offset + file_name_size]
