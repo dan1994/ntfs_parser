@@ -1,6 +1,7 @@
 from typing import Type
 
 from ntfs.utils.header import Header, MultiHeader, HeaderGenerator
+from ntfs.mft.data_runs import DataRuns
 
 
 class FileAttribute(MultiHeader):
@@ -10,18 +11,9 @@ class FileAttribute(MultiHeader):
         FILE_NAME = 0x30
         DATA = 0x80
 
-    def data(self) -> Type[Header]:
-        if self.is_resident:
-            return self._type_header
-        else:
-            raise NotImplementedError(
-                'Not handling non-resident attribute data yet')
-
     @property
-    def data_size(self) -> int:
-        if self.is_resident:
-            return self._residency_header.attribute_length
-        return self._residency_header.attribute_size
+    def is_valid(self) -> bool:
+        return self.attribute_type != FileAttribute.AttrType.INVALID
 
     @property
     def attribute_type(self) -> int:
@@ -30,6 +22,25 @@ class FileAttribute(MultiHeader):
     @property
     def is_resident(self) -> bool:
         return not self._constant_header.non_resident
+
+    @property
+    def data_size(self) -> int:
+        if self.is_resident:
+            return self._residency_header.attribute_length
+        return self._residency_header.attribute_size
+
+    @property
+    def data(self) -> Type[Header]:
+        if not self.is_resident:
+            raise RuntimeError(
+                'Can\'t retrieve data of a non-resident attribute')
+        return self._type_header.data
+
+    @property
+    def data_runs(self) -> DataRuns:
+        if self.is_resident:
+            raise RuntimeError('Resident attribute doesn\'t have data runs')
+        return self._data_runs
 
     def __len__(self) -> int:
         return self._constant_header.length
@@ -48,24 +59,30 @@ class FileAttribute(MultiHeader):
         self._residency_header = self._headers.pop(0)
         offset += len(self._residency_header)
 
-        if not self.is_resident:
-            return
+        self._type_header = None
+        self._data_runs = None
 
-        type_dependent_header_type = self._type_dependent_header()
-        if type_dependent_header_type is not None:
-            yield type_dependent_header_type, offset
-            self._type_header = self._headers.pop(0)
-            offset += len(self._type_header)
+        if self.is_resident:
+            type_dependent_header_type = self._type_dependent_header()
+            if type_dependent_header_type is not None:
+                yield type_dependent_header_type, offset
+                self._type_header = self._headers.pop(0)
+                offset += len(self._type_header)
+        else:
+            yield DataRuns, offset
+            self._data_runs = self._headers.pop(0)
 
-    def _residency_dependent_header(self) -> Type:
+    def _residency_dependent_header(self) -> type:
         if self.is_resident:
             return ResidentFileAttributeHeader
         else:
             return NonResidentFileAttributeHeader
 
-    def _type_dependent_header(self) -> Type:
-        if self.attribute_type == FileAttribute.AttrType.FILE_NAME:
-            return FileNameAttributeHeader
+    def _type_dependent_header(self) -> type:
+        return {
+            FileAttribute.AttrType.FILE_NAME: FileNameAttributeHeader,
+            FileAttribute.AttrType.DATA: RawData
+        }.get(self.attribute_type, None)
 
 
 class FileAttributeHeader(Header):
@@ -140,3 +157,20 @@ class FileNameAttributeHeader(Header):
         self.file_name = \
             data[file_name_offset: file_name_offset + file_name_size].\
             decode('utf-16')
+
+    @property
+    def data(self):
+        return self.file_name
+
+
+class RawData:
+
+    def __init__(self, data: bytes, offset: int):
+        self._data = data[offset:]
+
+    @property
+    def data(self) -> bytes:
+        return self._data
+
+    def __len__(self) -> int:
+        return len(self._data)

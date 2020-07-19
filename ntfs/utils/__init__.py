@@ -1,7 +1,7 @@
 from logging import getLogger, StreamHandler, Formatter, NOTSET
 
 
-ntfs_logger = getLogger('MyLogger')
+ntfs_logger = getLogger('NTFS')
 ntfs_handler = StreamHandler()
 ntfs_formatter = Formatter(
     '[%(asctime)s] %(name)s:%(levelname)s:%(message)s')

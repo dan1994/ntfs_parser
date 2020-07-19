@@ -2,6 +2,7 @@ from struct import unpack
 
 from ntfs.mft.file_attributes import FileAttributes, FileAttribute
 from ntfs.utils.header import MultiHeader, Header, HeaderGenerator
+from ntfs.mft.data_runs import DataRuns
 
 
 class FileEntry(MultiHeader):
@@ -10,34 +11,60 @@ class FileEntry(MultiHeader):
 
     MAGIC = unpack('I', b'FILE')[0]
 
-    def __bool__(self) -> bool:
+    def __init__(self, data: bytes, offset: int):
+        super(FileEntry, self).__init__(data, offset)
+
+        self._identify_attributes()
+
+    @property
+    def is_valid(self) -> bool:
         return self._header.magic == FileEntry.MAGIC
 
-    @ property
-    def path(self) -> str:
+    @property
+    def name(self) -> str:
+        if self._name_attribute is None:
+            return ''
+        return self._name_attribute.data
+
+    @property
+    def size(self) -> int:
+        if self._data_attribute is None:
+            return 0
+        return self._data_attribute.data_size
+
+    @property
+    def is_data_resident(self) -> bool:
+        return self._data_attribute.is_resident
+
+    @property
+    def data(self) -> bytes:
+        return self._data_attribute.data
+
+    @property
+    def data_runs(self) -> DataRuns:
+        return self._data_attribute.data_runs
+
+    def _identify_attributes(self) -> None:
+        self._name_attribute = None
+        self._data_attribute = None
+
+        if not self.is_valid:
+            return
+
         for attribute in self._attributes:
             if attribute.attribute_type == FileAttribute.AttrType.FILE_NAME:
-                return attribute.data().file_name
-
-    @ property
-    def file_size(self) -> int:
-        for attribute in self._attributes:
+                self._name_attribute = attribute
             if attribute.attribute_type == FileAttribute.AttrType.DATA:
-                return attribute.data_size
-        return 0
-
-    @ property
-    def first_attribute_offset(self) -> int:
-        return self._header.first_attribute_offset
+                self._data_attribute = attribute
 
     def _get_next_header_info(self) -> HeaderGenerator:
         yield FileEntryHeader, 0
         self._header = self._headers.pop(0)
 
-        if not self:
+        if not self.is_valid:
             return
 
-        yield FileAttributes, self.first_attribute_offset
+        yield FileAttributes, self._header.first_attribute_offset
         self._attributes = self._headers.pop(0)
 
 

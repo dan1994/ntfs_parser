@@ -17,13 +17,10 @@ class Vbr:
         with LogicalVolumeFile(volume_letter) as volume_file:
             raw_data = volume_file.read(Vbr.SIZE)
 
-        self._extract_data(raw_data)
+        self.sector_size_in_bytes, self.cluster_size_in_sectors = \
+            unpack_from('=HB', raw_data, Vbr.BPB_OFFSET)
+        self.mft_index = unpack_from('=Q', raw_data, Vbr.MFT_CLUSTER_OFFSET)[0]
 
-    def get_mft_start_address(self) -> int:
-        return self._mft_index * self._cluster_size_in_sectors * \
-            self._sector_size_in_bytes
-
-    def _extract_data(self, raw_data: bytes) -> None:
-        self._sector_size_in_bytes, self._cluster_size_in_sectors = \
-            unpack_from('HB', raw_data, Vbr.BPB_OFFSET)
-        self._mft_index = unpack_from('Q', raw_data, Vbr.MFT_CLUSTER_OFFSET)[0]
+        ntfs_logger.info(f'Sector size in bytes: {self.sector_size_in_bytes}')
+        ntfs_logger.info(f'Cluster size in sectors: '
+                         f'{self.cluster_size_in_sectors}')

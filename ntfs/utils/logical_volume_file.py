@@ -30,6 +30,11 @@ class LogicalVolumeFile:
 
     def read(self, size: int) -> bytes:
         data = b''
-        while len(data) < size:
-            data += self._file.read(size - len(data))
+        # while len(data) < size:
+        #     last_size = len(data)
+        #     data += self._file.read(size - len(data))
+
+        #     if last_size == len(data):
+        #         raise OSError('Reached EOF')
+        data = self._file.read(size)
         return data
