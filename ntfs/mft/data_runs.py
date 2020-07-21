@@ -3,6 +3,7 @@ from typing import Tuple
 from ntfs.utils.logical_volume_file import LogicalVolumeFile
 from ntfs.mft.data_run import DataRunHeader
 from ntfs.utils.header import HeaderList
+from ntfs.utils import ntfs_logger
 
 
 class DataRuns(HeaderList):
@@ -13,6 +14,8 @@ class DataRuns(HeaderList):
         data = b''
         with LogicalVolumeFile(self._volume_info.volume_letter) as volume_file:
             for offset, length in self:
+                ntfs_logger.debug(f'Retrieving run at {hex(offset)} with '
+                                  f'{length}')
                 volume_file.seek(offset)
                 data += volume_file.read(length)
         return data

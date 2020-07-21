@@ -29,7 +29,7 @@ class DataRunHeader(Header):
 
         self.length = int.from_bytes(length_field, byteorder) \
             * volume_info.cluster_size_in_bytes
-        self.offset = int.from_bytes(offset_field, byteorder) \
+        self.offset = int.from_bytes(offset_field, byteorder, signed=True) \
             * volume_info.cluster_size_in_bytes
 
     @property
