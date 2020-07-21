@@ -10,12 +10,12 @@ from ntfs.vbr import Vbr
 class LogicalVolume:
 
     def __init__(self, volume_letter: str):
-        vbr = Vbr(volume_letter)
+        vbr = Vbr.read_vbr(volume_letter)
         self._volume_info = VolumeInfo(volume_letter,
                                        vbr.sector_size_in_bytes,
                                        vbr.cluster_size_in_sectors)
 
-        mft_start_address = vbr.mft_index * \
+        mft_start_address = vbr.mft_logical_cluster_number * \
             self._volume_info.cluster_size_in_bytes
 
         ntfs_logger.info(f'MFT is at {hex(mft_start_address)}')
