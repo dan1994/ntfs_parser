@@ -143,7 +143,7 @@ class FileNameAttributeHeader(Header):
             data[file_name_offset: file_name_offset + file_name_size].\
             decode('utf-16')
 
-    def data(self):
+    def data(self) -> str:
         return self.file_name
 
 

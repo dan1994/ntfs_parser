@@ -37,7 +37,7 @@ class Mft:
 
         raise StopIteration()
 
-    def _read_mft_data(self):
+    def _read_mft_data(self) -> None:
         with self._volume_info.get_volume_file() as volume_file:
             volume_file.seek(self._base_address)
             mft_entry_content = volume_file.read(FileEntry.SIZE)

@@ -8,8 +8,6 @@ class File:
         self._volume_info = volume_info
         self._file_entry = file_entry
 
-        self._volume_file = volume_info.get_volume_file()
-
     def __enter__(self) -> 'File':
         self.open()
         return self
@@ -18,10 +16,10 @@ class File:
         self.close()
 
     def open(self) -> None:
-        self._volume_file.open()
+        pass
 
     def close(self) -> None:
-        self._volume_file.close()
+        pass
 
     def read(self) -> bytes:
         return self._file_entry.data()
