@@ -2,7 +2,6 @@ from struct import unpack
 
 from ntfs.mft.file_attributes import FileAttributes, FileAttribute
 from ntfs.utils.volume_info import VolumeInfo
-from ntfs.mft.data_runs import DataRuns
 from ntfs.utils.header import Header
 
 

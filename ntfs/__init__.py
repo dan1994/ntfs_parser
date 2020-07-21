@@ -1,21 +1,7 @@
-from os.path import splitdrive
-
 from ntfs.logical_volume import LogicalVolume
 from ntfs.file import File
 
 
-def open_ntfs_file(path: str) -> File:
-    volume_letter = _splitdrive_and_validate(path)
+def open_ntfs_file(volume_letter: str, file_name: str) -> File:
     logical_volume = LogicalVolume(volume_letter)
-    file_object = logical_volume.get_file(path)
-    file_object.open()
-    return file_object
-
-
-def _splitdrive_and_validate(path: str) -> str:
-    volume_name, _ = splitdrive(path)
-
-    if len(volume_name) == 0:
-        raise ValueError('An absolute path is required')
-
-    return volume_name[0]
+    return logical_volume.get_file(file_name)
