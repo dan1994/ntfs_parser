@@ -27,8 +27,10 @@ class DataRunHeader(Header):
         length_field = data[length_field_start: length_field_end]
         offset_field = data[offset_field_start: offset_field_end]
 
-        self.length = int.from_bytes(length_field, byteorder)
-        self.offset = int.from_bytes(offset_field, byteorder)
+        self.length = int.from_bytes(length_field, byteorder) \
+            * volume_info.cluster_size_in_bytes
+        self.offset = int.from_bytes(offset_field, byteorder) \
+            * volume_info.cluster_size_in_bytes
 
     @property
     def is_valid(self) -> bool:

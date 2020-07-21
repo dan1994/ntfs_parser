@@ -7,7 +7,7 @@ from ntfs.file import File
 class Mft:
 
     def __init__(self, volume_info: VolumeInfo, base_address: int):
-        ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
+        ntfs_logger.debug(f"{self.__class__}")
 
         self._volume_info = volume_info
         self._base_address = base_address

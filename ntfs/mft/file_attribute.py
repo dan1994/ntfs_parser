@@ -28,45 +28,32 @@ class FileAttribute:
     def is_resident(self) -> bool:
         return not self._constant_header.non_resident
 
-    @property
-    def data_size(self) -> int:
+    def data(self) -> bytes:
         if self.is_resident:
-            return self._residency_header.attribute_length
-        return self._residency_header.attribute_size
-
-    @property
-    def data(self) -> Type[Header]:
-        if not self.is_resident:
-            raise RuntimeError(
-                'Can\'t retrieve data of a non-resident attribute')
-        return self._type_header.data
-
-    @property
-    def data_runs(self) -> DataRuns:
-        if self.is_resident:
-            raise RuntimeError('Resident attribute doesn\'t have data runs')
-        return self._data_runs
+            raw_data = self._resident_data
+        else:
+            raw_data = self._data_runs.data()
+        return self._type_dependent_header(raw_data).data()
 
     def __len__(self) -> int:
         return self._constant_header.length
 
     def _parse(self, data) -> None:
         self._constant_header = FileAttributeHeader(self._volume_info, data)
-        data = data[len(self._constant_header):]
+        offset = len(self._constant_header)
 
         if not self.is_valid:
             return
 
-        self._parse_residency_header(data)
-        data = data[len(self._residency_header):]
-
-        self._type_header = None
-        self._data_runs = None
+        self._parse_residency_header(data[offset:])
+        offset += len(self._residency_header)
 
         if self.is_resident:
-            self._parse_type_dependent_header(data)
+            offset = self._residency_header.attribute_offset
+            length = self._residency_header.attribute_length
+            self._resident_data = data[offset: offset + length]
         else:
-            self._data_runs = DataRuns(self._volume_info, data)
+            self._data_runs = DataRuns(self._volume_info, data[offset:])
 
     def _parse_residency_header(self, data) -> None:
         if self.is_resident:
@@ -76,15 +63,11 @@ class FileAttribute:
             self._residency_header = \
                 NonResidentFileAttributeHeader(self._volume_info, data)
 
-    def _parse_type_dependent_header(self, data) -> None:
-        type_dependent_header_type = {
+    def _type_dependent_header(self, data) -> Type[Header]:
+        return {
             FileAttribute.AttrType.FILE_NAME: FileNameAttributeHeader,
             FileAttribute.AttrType.DATA: RawData
-        }.get(self.attribute_type, None)
-
-        if type_dependent_header_type is not None:
-            self._type_header = type_dependent_header_type(
-                self._volume_info, data)
+        }.get(self.attribute_type, RawData)(self._volume_info, data)
 
 
 class FileAttributeHeader(Header):
@@ -160,7 +143,6 @@ class FileNameAttributeHeader(Header):
             data[file_name_offset: file_name_offset + file_name_size].\
             decode('utf-16')
 
-    @property
     def data(self):
         return self.file_name
 
@@ -170,7 +152,6 @@ class RawData:
     def __init__(self, volume_info: VolumeInfo, data: bytes):
         self._data = data
 
-    @property
     def data(self) -> bytes:
         return self._data
 

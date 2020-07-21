@@ -1,5 +1,6 @@
 from typing import Tuple
 
+from ntfs.utils.logical_volume_file import LogicalVolumeFile
 from ntfs.mft.data_run import DataRunHeader
 from ntfs.utils.header import HeaderList
 
@@ -7,6 +8,14 @@ from ntfs.utils.header import HeaderList
 class DataRuns(HeaderList):
 
     HEADER_TYPE = DataRunHeader
+
+    def data(self):
+        data = b''
+        with LogicalVolumeFile(self._volume_info.volume_letter) as volume_file:
+            for offset, length in self:
+                volume_file.seek(offset)
+                data += volume_file.read(length)
+        return data
 
     def __iter__(self) -> 'DataRuns':
         self._absolute_offset = 0

@@ -24,25 +24,10 @@ class FileEntry:
     def name(self) -> str:
         if self._name_attribute is None:
             return ''
-        return self._name_attribute.data
+        return self._name_attribute.data()
 
-    @property
-    def size(self) -> int:
-        if self._data_attribute is None:
-            return 0
-        return self._data_attribute.data_size
-
-    @property
-    def is_data_resident(self) -> bool:
-        return self._data_attribute.is_resident
-
-    @property
     def data(self) -> bytes:
-        return self._data_attribute.data
-
-    @property
-    def data_runs(self) -> DataRuns:
-        return self._data_attribute.data_runs
+        return self._data_attribute.data()
 
     def _parse(self, data: bytes) -> None:
         self._header = FileEntryHeader(self._volume_info, data)
