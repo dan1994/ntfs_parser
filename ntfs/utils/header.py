@@ -1,59 +1,46 @@
-from typing import Generator, Tuple, Type
 from struct import error as struct_error
-from struct import unpack_from
+from struct import unpack
+from typing import Type
 
+from ntfs.utils.volume_info import VolumeInfo
 from ntfs.utils import ntfs_logger
-
-HeaderGenerator = Generator[Tuple[type, int], None, None]
-
-
-class MultiHeader:
-
-    def __init__(self, data: bytes, offset: int):
-        ntfs_logger.debug(f'{self.__class__}, {hex(offset)}')
-
-        self._data = data
-        self._offset = offset
-        self._headers = []
-
-        self._parse_headers()
-
-    def _parse_headers(self) -> None:
-        for header_type, offset in self._get_next_header_info():
-            total_offset = self._offset + offset
-            self._headers.append(header_type(self._data, total_offset))
-
-    def _get_next_header_info(self) -> HeaderGenerator:
-        pass
 
 
 class Header:
 
     FMT = ''
 
-    def __init__(self, data: bytes, offset: int):
-        ntfs_logger.debug(f'{self.__class__}, {hex(offset)}')
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        ntfs_logger.debug(f'{self.__class__}')
 
-        self._data = unpack_from('=' + self.FMT, data, offset)
+        data_to_unpack = data[:self._fmt_size_in_bytes()]
+
+        self._data = unpack('=' + self.FMT, data_to_unpack)
 
     def is_valid(self) -> bool:
         return False
 
     def __len__(self) -> int:
+        return self._fmt_size_in_bytes()
+
+    def _fmt_size_in_bytes(self) -> int:
         return self.FMT.count('B') + 2 * self.FMT.count('H') + \
             4 * self.FMT.count('I') + 8 * self.FMT.count('Q')
 
 
-class HeaderList(MultiHeader):
+class HeaderList:
 
     HEADER_TYPE = None
 
-    def __init__(self, data: bytes, offset: int):
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        ntfs_logger.debug(f'{self.__class__}')
+
+        self._volume_info = volume_info
+
         try:
-            super(HeaderList, self).__init__(data, offset)
+            self._collect_headers(data)
         except struct_error:
-            ntfs_logger.warning(
-                'Reached end of data while parsing headers')
+            ntfs_logger.warning('Data ran out while parsing header list')
 
     def __iter__(self) -> 'HeaderList':
         self._index = 0
@@ -73,10 +60,10 @@ class HeaderList(MultiHeader):
     def __len__(self) -> int:
         return len(self._headers)
 
-    def _get_next_header_info(self) -> HeaderGenerator:
-        current_offset = 0
-        yield self.HEADER_TYPE, current_offset
+    def _collect_headers(self, data) -> None:
+        self._headers = []
+        self._headers.append(self.HEADER_TYPE(self._volume_info, data))
 
         while self._headers[-1].is_valid:
-            current_offset += len(self._headers[-1])
-            yield self.HEADER_TYPE, current_offset
+            data = data[len(self._headers[-1]):]
+            self._headers.append(self.HEADER_TYPE(self._volume_info, data))

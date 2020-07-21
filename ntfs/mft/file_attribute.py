@@ -1,15 +1,20 @@
 from typing import Type
 
-from ntfs.utils.header import Header, MultiHeader, HeaderGenerator
+from ntfs.utils.volume_info import VolumeInfo
 from ntfs.mft.data_runs import DataRuns
+from ntfs.utils.header import Header
 
 
-class FileAttribute(MultiHeader):
+class FileAttribute:
 
     class AttrType:
         INVALID = 0xffffffff
         FILE_NAME = 0x30
         DATA = 0x80
+
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        self._volume_info = volume_info
+        self._parse(data)
 
     @property
     def is_valid(self) -> bool:
@@ -45,52 +50,49 @@ class FileAttribute(MultiHeader):
     def __len__(self) -> int:
         return self._constant_header.length
 
-    def _get_next_header_info(self) -> HeaderGenerator:
-        offset = 0
+    def _parse(self, data) -> None:
+        self._constant_header = FileAttributeHeader(self._volume_info, data)
+        data = data[len(self._constant_header):]
 
-        yield FileAttributeHeader, offset
-        self._constant_header = self._headers.pop(0)
-        offset += len(self._constant_header)
-
-        if self.attribute_type == FileAttribute.AttrType.INVALID:
+        if not self.is_valid:
             return
 
-        yield self._residency_dependent_header(), offset
-        self._residency_header = self._headers.pop(0)
-        offset += len(self._residency_header)
+        self._parse_residency_header(data)
+        data = data[len(self._residency_header):]
 
         self._type_header = None
         self._data_runs = None
 
         if self.is_resident:
-            type_dependent_header_type = self._type_dependent_header()
-            if type_dependent_header_type is not None:
-                yield type_dependent_header_type, offset
-                self._type_header = self._headers.pop(0)
-                offset += len(self._type_header)
+            self._parse_type_dependent_header(data)
         else:
-            yield DataRuns, offset
-            self._data_runs = self._headers.pop(0)
+            self._data_runs = DataRuns(self._volume_info, data)
 
-    def _residency_dependent_header(self) -> type:
+    def _parse_residency_header(self, data) -> None:
         if self.is_resident:
-            return ResidentFileAttributeHeader
+            self._residency_header = \
+                ResidentFileAttributeHeader(self._volume_info, data)
         else:
-            return NonResidentFileAttributeHeader
+            self._residency_header = \
+                NonResidentFileAttributeHeader(self._volume_info, data)
 
-    def _type_dependent_header(self) -> type:
-        return {
+    def _parse_type_dependent_header(self, data) -> None:
+        type_dependent_header_type = {
             FileAttribute.AttrType.FILE_NAME: FileNameAttributeHeader,
             FileAttribute.AttrType.DATA: RawData
         }.get(self.attribute_type, None)
+
+        if type_dependent_header_type is not None:
+            self._type_header = type_dependent_header_type(
+                self._volume_info, data)
 
 
 class FileAttributeHeader(Header):
 
     FMT = 'IIBBHHH'
 
-    def __init__(self, data: bytes, offset: int):
-        super(FileAttributeHeader, self).__init__(data, offset)
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        super(FileAttributeHeader, self).__init__(volume_info, data)
 
         self.attribute_type, \
             self.length, \
@@ -105,8 +107,8 @@ class ResidentFileAttributeHeader(Header):
 
     FMT = 'IHBB'
 
-    def __init__(self, data: bytes, offset: int):
-        super(ResidentFileAttributeHeader, self).__init__(data, offset)
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        super(ResidentFileAttributeHeader, self).__init__(volume_info, data)
 
         self.attribute_length, \
             self.attribute_offset, \
@@ -118,8 +120,8 @@ class NonResidentFileAttributeHeader(Header):
 
     FMT = 'QQHHIQQQ'
 
-    def __init__(self, data: bytes, offset: int):
-        super(NonResidentFileAttributeHeader, self).__init__(data, offset)
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        super(NonResidentFileAttributeHeader, self).__init__(volume_info, data)
 
         self.first_cluster, \
             self.last_cluster, \
@@ -135,8 +137,8 @@ class FileNameAttributeHeader(Header):
 
     FMT = 'IHHQQQQQQIIBB'
 
-    def __init__(self, data: bytes, offset: int):
-        super(FileNameAttributeHeader, self).__init__(data, offset)
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        super(FileNameAttributeHeader, self).__init__(volume_info, data)
 
         self.parent_record_number1, \
             self.parent_record_number2, \
@@ -152,7 +154,7 @@ class FileNameAttributeHeader(Header):
             self.file_name_length, \
             self.namespace_type = self._data
 
-        file_name_offset = offset + len(self)
+        file_name_offset = len(self)
         file_name_size = self.file_name_length * 2
         self.file_name = \
             data[file_name_offset: file_name_offset + file_name_size].\
@@ -165,8 +167,8 @@ class FileNameAttributeHeader(Header):
 
 class RawData:
 
-    def __init__(self, data: bytes, offset: int):
-        self._data = data[offset:]
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        self._data = data
 
     @property
     def data(self) -> bytes:

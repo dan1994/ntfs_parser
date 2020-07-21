@@ -1,4 +1,4 @@
-from ntfs.utils.logical_volume_file import LogicalVolumeFile
+from ntfs.utils.volume_info import VolumeInfo
 from ntfs.mft.file_entry import FileEntry
 from ntfs.utils import ntfs_logger
 from ntfs.file import File
@@ -6,19 +6,13 @@ from ntfs.file import File
 
 class Mft:
 
-    def __init__(self, volume_letter: str, base_address: int,
-                 cluster_size_in_bytes: int):
+    def __init__(self, volume_info: VolumeInfo, base_address: int):
         ntfs_logger.debug(f"{self.__class__}, {hex(base_address)}")
 
-        with LogicalVolumeFile(volume_letter) as volume_file:
-            volume_file.seek(base_address)
-            mft_entry_content = volume_file.read(FileEntry.SIZE)
-
-        mft_entry = FileEntry(mft_entry_content, 0)
-        with File(volume_letter, cluster_size_in_bytes, mft_entry) as mft_file:
-            self._data = mft_file.read()
-
+        self._volume_info = volume_info
         self._base_address = base_address
+
+        self._read_mft_data()
 
     def __iter__(self) -> 'Mft':
         self._entry_base_address = 0
@@ -30,9 +24,10 @@ class Mft:
                 info(f'Retrieving file entry at '
                      f'{hex(self._base_address + self._entry_base_address)}')
 
-            entry = FileEntry(
-                self._data[self._entry_base_address:
-                           self._entry_base_address + FileEntry.SIZE], 0)
+            entry = FileEntry(self._volume_info,
+                              self._data[self._entry_base_address:
+                                         self._entry_base_address +
+                                         FileEntry.SIZE])
             self._entry_base_address += FileEntry.SIZE
 
             if entry.is_valid:
@@ -41,3 +36,12 @@ class Mft:
                 ntfs_logger.warning('Invalid file entry, skipping...')
 
         raise StopIteration()
+
+    def _read_mft_data(self):
+        with self._volume_info.get_volume_file() as volume_file:
+            volume_file.seek(self._base_address)
+            mft_entry_content = volume_file.read(FileEntry.SIZE)
+
+        mft_entry = FileEntry(self._volume_info, mft_entry_content)
+        with File(self._volume_info, mft_entry) as mft_file:
+            self._data = mft_file.read()

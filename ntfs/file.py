@@ -1,15 +1,15 @@
-from ntfs.utils.logical_volume_file import LogicalVolumeFile
+from ntfs.utils.volume_info import VolumeInfo
 from ntfs.mft.file_entry import FileEntry
 from ntfs.utils import ntfs_logger
 
 
 class File:
 
-    def __init__(self, volume_letter: str, cluster_size_in_bytes: int,
-                 file_entry: FileEntry):
-        self._volume_file = LogicalVolumeFile(volume_letter)
-        self._cluster_size_in_bytes = cluster_size_in_bytes
+    def __init__(self, volume_info: VolumeInfo, file_entry: FileEntry):
+        self._volume_info = volume_info
         self._file_entry = file_entry
+
+        self._volume_file = volume_info.get_volume_file()
 
     def __enter__(self) -> 'File':
         self.open()
@@ -38,8 +38,8 @@ class File:
     def _read_non_resident_data(self) -> bytes:
         data = b''
         for offset, length in self._file_entry.data_runs:
-            offset_in_bytes = offset * self._cluster_size_in_bytes
-            length_in_bytes = length * self._cluster_size_in_bytes
+            offset_in_bytes = offset * self._volume_info.cluster_size_in_bytes
+            length_in_bytes = length * self._volume_info.cluster_size_in_bytes
 
             ntfs_logger.debug(f'Next chunk at {hex(offset_in_bytes)}, with '
                               f'length {hex(length_in_bytes)}')

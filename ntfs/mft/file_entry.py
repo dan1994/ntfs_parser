@@ -1,20 +1,20 @@
 from struct import unpack
 
 from ntfs.mft.file_attributes import FileAttributes, FileAttribute
-from ntfs.utils.header import MultiHeader, Header, HeaderGenerator
+from ntfs.utils.volume_info import VolumeInfo
 from ntfs.mft.data_runs import DataRuns
+from ntfs.utils.header import Header
 
 
-class FileEntry(MultiHeader):
+class FileEntry:
 
     SIZE = 1024
 
     MAGIC = unpack('I', b'FILE')[0]
 
-    def __init__(self, data: bytes, offset: int):
-        super(FileEntry, self).__init__(data, offset)
-
-        self._identify_attributes()
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        self._volume_info = volume_info
+        self._parse(data)
 
     @property
     def is_valid(self) -> bool:
@@ -44,6 +44,17 @@ class FileEntry(MultiHeader):
     def data_runs(self) -> DataRuns:
         return self._data_attribute.data_runs
 
+    def _parse(self, data: bytes) -> None:
+        self._header = FileEntryHeader(self._volume_info, data)
+
+        if not self.is_valid:
+            return
+
+        data = data[self._header.first_attribute_offset:]
+
+        self._attributes = FileAttributes(self._volume_info, data)
+        self._identify_attributes()
+
     def _identify_attributes(self) -> None:
         self._name_attribute = None
         self._data_attribute = None
@@ -57,23 +68,13 @@ class FileEntry(MultiHeader):
             if attribute.attribute_type == FileAttribute.AttrType.DATA:
                 self._data_attribute = attribute
 
-    def _get_next_header_info(self) -> HeaderGenerator:
-        yield FileEntryHeader, 0
-        self._header = self._headers.pop(0)
-
-        if not self.is_valid:
-            return
-
-        yield FileAttributes, self._header.first_attribute_offset
-        self._attributes = self._headers.pop(0)
-
 
 class FileEntryHeader(Header):
 
     FMT = 'IHHQHHHHIIQHHI'
 
-    def __init__(self, data: bytes, offset: int):
-        super(FileEntryHeader, self).__init__(data, offset)
+    def __init__(self, volume_info: VolumeInfo, data: bytes):
+        super(FileEntryHeader, self).__init__(volume_info, data)
 
         self.magic, \
             self.update_sequence_offset, \
